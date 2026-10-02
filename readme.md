@@ -23,6 +23,33 @@ Blueprint zur automatischen Steuerung eines Rollladens in Home Assistant.
 
 Der Blueprint kann direkt in Home Assistant importiert werden:
 
+### Voraussetzungen – benötigte Helfer
+
+Bevor der Blueprint verwendet wird, sollten in Home Assistant folgende drei Helfer angelegt werden:
+
+1. **Astro Rollladen**
+   - Typ: **Umschalter**
+   - Entität: `input_boolean.astro_rollladen`
+   - Dieser Helfer steuert den Tag-/Nachtzustand für die Rollladenautomatik.
+
+2. **Beschattung**
+   - Typ: **Umschalter**
+   - Entität: `input_boolean.beschattung`
+   - Dieser Helfer aktiviert bzw. deaktiviert die automatische Beschattungsfunktion.
+
+3. **Ruhe Rollladen**
+   - Typ: **Umschalter**
+   - Entität: `input_boolean.ruhe_rollladen`
+   - Dieser Helfer aktiviert den Ruhemodus und verhindert das automatische Öffnen des Rollladens am Morgen.
+
+Die Helfer können in Home Assistant unter:
+
+**Einstellungen → Geräte & Dienste → Helfer → Helfer erstellen → Umschalter**
+
+angelegt werden.
+
+Anschließend kann der Blueprint importiert und die entsprechenden Helfer bei der Konfiguration ausgewählt werden.
+
 [![Open your Home Assistant instance and show the blueprint import dialog.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fossilampe%2FHome-Automatisierung%2Fblob%2Fmaster%2Fblueprints%2Ffensterautomation.yaml)
 
 Alternativ kann der Blueprint hier aufgerufen werden:
