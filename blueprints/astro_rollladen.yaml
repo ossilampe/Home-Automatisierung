@@ -1,0 +1,31 @@
+alias: >-
+  Astro Rollladen – Sonnenaufgang und Sonnenuntergang laut Integration Wetter
+  Sun
+description: |
+  - Sonnenaufgang erreicht → Astro Rollladen AUS
+  - Sonnenuntergang erreicht → Astro Rollladen EIN
+triggers:
+  - trigger: time
+    at: sensor.sun_next_rising
+    id: sonnenaufgang
+  - trigger: time
+    at: sensor.sun_next_setting
+    id: sonnenuntergang
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: sonnenaufgang
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.astro_rolladen
+      - conditions:
+          - condition: trigger
+            id: sonnenuntergang
+        sequence:
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.astro_rolladen
+mode: single
