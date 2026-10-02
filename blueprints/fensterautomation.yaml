@@ -1,0 +1,437 @@
+blueprint:
+  name: Rollladensteuerung – Astro, Fenster, Ruhemodus und Beschattung
+  description: |
+    - Astro EIN (Nacht): Beschattung AUS, nach Verzögerung Rollladen schließen.
+    - Fenster nachts offen: Rollladen auf eingestellte Fensterposition.
+    - Fenster nachts geschlossen: Rollladen vollständig schließen.
+    - Fenster tagsüber: Keine Reaktion.
+    - Beschattung EIN: Rollladen auf eingestellte Beschattungsposition.
+    - Beschattung AUS: Rollladen öffnen, sofern Ruhemodus nicht aktiv ist.
+    - Astro AUS (Tag): Nach Verzögerung Rollladen öffnen.
+    - Ruhemodus verwenden AUS: Ruhemodus wird komplett ignoriert.
+    - Ruhemodus verwenden EIN: Ausgewählter Ruhemodus wird berücksichtigt.
+    - Ruhemodus tagsüber AUS: Rollladen öffnet bzw. fährt in Beschattungsposition.
+    - Späteste Öffnungszeit: Ruhemodus wird ignoriert und Rollladen öffnet.
+    - Bei aktiver Beschattung fährt er dabei auf die Beschattungsposition.
+  domain: automation
+
+  input:
+    fenster_sensor:
+      name: Fensterkontakt
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+
+    rollladen_cover:
+      name: Rollladen
+      selector:
+        entity:
+          filter:
+            - domain: cover
+
+    astro_modus:
+      name: Astro-Modus
+      description: EIN = Nacht / AUS = Tag
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+
+    ruhemodus_verwenden:
+      name: Ruhemodus verwenden
+      description: |
+        Aktivieren, wenn für diesen Rollladen der Ruhemodus
+        berücksichtigt werden soll.
+      default: false
+      selector:
+        boolean:
+
+    ruhe_modus:
+      name: Ruhemodus
+      description: |
+        Optional den Input-Boolean für den Ruhemodus auswählen.
+        Wird nur berücksichtigt, wenn "Ruhemodus verwenden" aktiviert ist.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+
+    beschattung_modus:
+      name: Beschattung Rollladen
+      description: |
+        Bei EIN fährt der Rollladen tagsüber auf die
+        eingestellte Beschattungsposition.
+        Beim Wechsel auf Nacht wird die Beschattung automatisch deaktiviert.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+
+    spaeteste_oeffnungszeit:
+      name: Späteste Öffnungszeit
+      description: |
+        Spätestens zu dieser Uhrzeit wird der Rollladen geöffnet.
+        Der Ruhemodus wird dabei immer ignoriert.
+        Bei aktiver Beschattung wird die Beschattungsposition angefahren.
+      default: "10:00:00"
+      selector:
+        time:
+
+    oeffnungshaehe_fenster:
+      name: Öffnungshöhe bei offenem Fenster
+      default: 25
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+
+    beschattung_behang:
+      name: Beschattung Behang
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+
+    verzoegerung_oeffnen_min:
+      name: Verzögerung morgens
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 120
+          step: 1
+          unit_of_measurement: min
+
+    verzoegerung_schliessen_min:
+      name: Verzögerung abends
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 120
+          step: 1
+          unit_of_measurement: min
+
+triggers:
+  - trigger: state
+    entity_id: !input fenster_sensor
+    id: fenster_wechsel
+
+  - trigger: state
+    entity_id: !input astro_modus
+    to: "off"
+    id: astro_wird_false
+
+  - trigger: state
+    entity_id: !input astro_modus
+    to: "on"
+    id: astro_wird_true
+
+  - trigger: state
+    entity_id: !input beschattung_modus
+    to: "on"
+    id: beschattung_ein
+
+  - trigger: state
+    entity_id: !input beschattung_modus
+    to: "off"
+    id: beschattung_aus
+
+  - trigger: state
+    entity_id: !input ruhe_modus
+    to: "off"
+    id: ruhemodus_aus
+
+  - trigger: time
+    at: !input spaeteste_oeffnungszeit
+    id: spaeteste_oeffnungszeit
+
+variables:
+  fenster_sensor: !input fenster_sensor
+  rollladen_cover: !input rollladen_cover
+  astro_modus: !input astro_modus
+  ruhemodus_verwenden: !input ruhemodus_verwenden
+  ruhe_modus: !input ruhe_modus
+  beschattung_modus: !input beschattung_modus
+  oeffnungshaehe_fenster: !input oeffnungshaehe_fenster
+  beschattung_behang: !input beschattung_behang
+  verzoegerung_oeffnen_min: !input verzoegerung_oeffnen_min
+  verzoegerung_schliessen_min: !input verzoegerung_schliessen_min
+
+conditions: []
+
+actions:
+  - choose:
+
+      # ==========================================================
+      # FENSTER WIRD NACHTS GEÖFFNET
+      # ==========================================================
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'fenster_wechsel'
+                and is_state(fenster_sensor, 'on')
+                and is_state(astro_modus, 'on')
+              }}
+        sequence:
+          - action: cover.set_cover_position
+            target:
+              entity_id: "{{ rollladen_cover }}"
+            data:
+              position: "{{ oeffnungshaehe_fenster | int }}"
+
+      # ==========================================================
+      # FENSTER WIRD NACHTS GESCHLOSSEN
+      # ==========================================================
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'fenster_wechsel'
+                and is_state(fenster_sensor, 'off')
+                and is_state(astro_modus, 'on')
+              }}
+        sequence:
+          - action: cover.close_cover
+            target:
+              entity_id: "{{ rollladen_cover }}"
+
+      # ==========================================================
+      # MORGEN – ASTRO WIRD AUS
+      # ==========================================================
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'astro_wird_false' }}
+        sequence:
+          - delay:
+              minutes: "{{ verzoegerung_oeffnen_min | int(0) }}"
+
+          - choose:
+              # Ruhemodus wird verwendet UND ist EIN
+              # -> nichts machen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        ruhemodus_verwenden
+                        and ruhe_modus != ''
+                        and is_state(ruhe_modus, 'on')
+                      }}
+                sequence:
+                  - delay:
+                      milliseconds: 1
+
+              # Ruhemodus nicht aktiv UND Beschattung EIN
+              # -> Beschattungsposition
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        (
+                          not ruhemodus_verwenden
+                          or ruhe_modus == ''
+                          or is_state(ruhe_modus, 'off')
+                        )
+                        and is_state(beschattung_modus, 'on')
+                      }}
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ beschattung_behang | int }}"
+
+              # Ruhemodus nicht aktiv UND Beschattung AUS
+              # -> vollständig öffnen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        (
+                          not ruhemodus_verwenden
+                          or ruhe_modus == ''
+                          or is_state(ruhe_modus, 'off')
+                        )
+                        and is_state(beschattung_modus, 'off')
+                      }}
+                sequence:
+                  - action: cover.open_cover
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+
+      # ==========================================================
+      # RUHEMODUS WIRD TAGSÜBER AUSGESCHALTET
+      # ==========================================================
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'ruhemodus_aus'
+                and ruhemodus_verwenden
+                and ruhe_modus != ''
+                and is_state(astro_modus, 'off')
+              }}
+        sequence:
+          - choose:
+              # Beschattung ist aktiv
+              # -> Beschattungsposition
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ is_state(beschattung_modus, 'on') }}
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ beschattung_behang | int }}"
+
+            # Keine Beschattung
+            # -> vollständig öffnen
+            default:
+              - action: cover.open_cover
+                target:
+                  entity_id: "{{ rollladen_cover }}"
+
+      # ==========================================================
+      # SPÄTESTE ÖFFNUNGSZEIT / ZWANGSÖFFNUNG
+      # Ruhemodus wird IMMER ignoriert
+      # ==========================================================
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'spaeteste_oeffnungszeit'
+                and is_state(astro_modus, 'off')
+              }}
+        sequence:
+          - choose:
+              # Beschattung aktiv
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ is_state(beschattung_modus, 'on') }}
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ beschattung_behang | int }}"
+
+            # Keine Beschattung
+            default:
+              - action: cover.open_cover
+                target:
+                  entity_id: "{{ rollladen_cover }}"
+
+      # ==========================================================
+      # ABEND – ASTRO WIRD EIN
+      # ==========================================================
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'astro_wird_true' }}
+        sequence:
+
+          # Beschattung automatisch ausschalten
+          - action: input_boolean.turn_off
+            target:
+              entity_id: "{{ beschattung_modus }}"
+
+          # Abend-Verzögerung
+          - delay:
+              minutes: "{{ verzoegerung_schliessen_min | int(0) }}"
+
+          # Aktuellen Fensterzustand prüfen
+          - choose:
+              # Fenster offen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ is_state(fenster_sensor, 'on') }}
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ oeffnungshaehe_fenster | int }}"
+
+              # Fenster geschlossen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ is_state(fenster_sensor, 'off') }}
+                sequence:
+                  - action: cover.close_cover
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+
+      # ==========================================================
+      # BESCHATTUNG TAGSÜBER EIN
+      # ==========================================================
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'beschattung_ein'
+                and is_state(astro_modus, 'off')
+              }}
+        sequence:
+          - action: cover.set_cover_position
+            target:
+              entity_id: "{{ rollladen_cover }}"
+            data:
+              position: "{{ beschattung_behang | int }}"
+
+      # ==========================================================
+      # BESCHATTUNG TAGSÜBER AUS
+      # ==========================================================
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'beschattung_aus'
+                and is_state(astro_modus, 'off')
+              }}
+        sequence:
+          - choose:
+              # Ruhemodus aktiv
+              # -> nichts machen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        ruhemodus_verwenden
+                        and ruhe_modus != ''
+                        and is_state(ruhe_modus, 'on')
+                      }}
+                sequence:
+                  - delay:
+                      milliseconds: 1
+
+              # Ruhemodus nicht aktiv
+              # -> vollständig öffnen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        not ruhemodus_verwenden
+                        or ruhe_modus == ''
+                        or is_state(ruhe_modus, 'off')
+                      }}
+                sequence:
+                  - action: cover.open_cover
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+
+mode: parallel
+max: 10
