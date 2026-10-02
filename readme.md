@@ -83,7 +83,7 @@ Dadurch erhält der eigentliche Rollladen-Blueprint automatisch die Information,
 
 Die dazugehörige Automation befindet sich hier:
 
-[`automationen/astro_rollladen.yaml`](automationen/astro_rollladen.yaml)
+[`automationen/blueprints/astro_rollladen.yaml`](automationen/blueprints/astro_rollladen.yaml)
 
 Diese Automation sollte zusätzlich zum Rollladen-Blueprint in Home Assistant eingerichtet werden, wenn der Helfer **Astro Rollladen** automatisch gesteuert werden soll.
 
