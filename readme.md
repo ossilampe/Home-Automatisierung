@@ -65,3 +65,26 @@ Für die Verwendung müssen die benötigten Entitäten in Home Assistant vorhand
 - Astro-Modus
 - Beschattungsmodus
 - optional ein Ruhemodus
+
+### 🌅 Automatische Astro-Steuerung über die Sun-Integration
+
+Damit der Helfer **„Astro Rollladen“** nicht manuell geschaltet werden muss, gibt es zusätzlich eine passende Automation.
+
+Diese Automation verwendet die in Home Assistant integrierte **Sun-Integration** und schaltet den Helfer `input_boolean.astro_rollladen` automatisch abhängig von Sonnenaufgang und Sonnenuntergang.
+
+Dadurch erhält der eigentliche Rollladen-Blueprint automatisch die Information, ob sich die Rollladensteuerung im **Tag- oder Nachtmodus** befindet.
+
+#### Funktionsweise
+
+- 🌅 Bei Sonnenaufgang wird **Astro Rollladen** entsprechend auf Tagbetrieb geschaltet.
+- 🌇 Bei Sonnenuntergang wird **Astro Rollladen** entsprechend auf Nachtbetrieb geschaltet.
+- 🔄 Die Umschaltung erfolgt automatisch über die Home-Assistant-Sun-Integration.
+- 🏠 Es ist keine zusätzliche Wetter- oder Cloud-Integration erforderlich.
+
+Die dazugehörige Automation befindet sich hier:
+
+[`automationen/astro_rollladen.yaml`](automationen/astro_rollladen.yaml)
+
+Diese Automation sollte zusätzlich zum Rollladen-Blueprint in Home Assistant eingerichtet werden, wenn der Helfer **Astro Rollladen** automatisch gesteuert werden soll.
+
+> **Hinweis:** Der Blueprint selbst funktioniert mit dem Helfer `input_boolean.astro_rollladen`. Ob dieser Helfer manuell oder über die zusätzliche Astro-Automation geschaltet wird, spielt für den Blueprint keine Rolle.
