@@ -1,0 +1,722 @@
+blueprint:
+  name: Rollladensteuerung – Balkontür, Astro, Ruhemodus und Beschattung
+  description: |
+    Balkontür-Version mit Schutz vor Aussperren.
+
+    Prioritäten:
+    - Tür OFFEN: Rollladen darf NICHT herunterfahren.
+    - Tür OFFEN: Beschattung wird nicht angefahren.
+    - Tür OFFEN: Nachtmodus schließt den Rollladen nicht.
+    - Tür GEKIPPT: Nachts fährt der Rollladen auf die eingestellte Kipp-Position.
+    - Tür GESCHLOSSEN: Nachts fährt der Rollladen vollständig zu.
+    - Wird eine offene Tür nachts geschlossen:
+      Rollladen fährt vollständig zu.
+    - Wird eine offene Tür nachts gekippt:
+      Rollladen fährt auf die eingestellte Kipp-Position.
+    - Wird die Tür tagsüber geschlossen:
+      Bei aktiver Beschattung fährt der Rollladen auf Beschattungsposition.
+    - Astro AUS (Tag): Rollladen öffnet nach Verzögerung.
+    - Ruhemodus kann optional berücksichtigt werden.
+    - Späteste Öffnungszeit ignoriert den Ruhemodus.
+
+  domain: automation
+
+  input:
+
+    tuer_offen_sensor:
+      name: Balkontür – Offen
+      description: |
+        Binärsensor, der EIN ist, wenn die Balkontür vollständig geöffnet ist.
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+
+    tuer_gekippt_sensor:
+      name: Balkontür – Gekippt
+      description: |
+        Binärsensor, der EIN ist, wenn die Balkontür gekippt ist.
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+
+    rollladen_cover:
+      name: Rollladen
+      selector:
+        entity:
+          filter:
+            - domain: cover
+
+    astro_modus:
+      name: Astro-Modus
+      description: EIN = Nacht / AUS = Tag
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+
+    ruhemodus_verwenden:
+      name: Ruhemodus verwenden
+      description: |
+        EIN = Ruhemodus berücksichtigen.
+        AUS = Ruhemodus ignorieren.
+      default: false
+      selector:
+        boolean:
+
+    ruhe_modus:
+      name: Ruhemodus
+      description: |
+        Optional.
+        Nur auswählen, wenn der Ruhemodus verwendet werden soll.
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+          multiple: true
+
+    beschattung_modus:
+      name: Beschattung Rollladen
+      description: |
+        Bei EIN fährt der Rollladen tagsüber auf die
+        eingestellte Beschattungsposition.
+        Bei geöffneter Balkontür wird die Beschattung NICHT angefahren.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+
+    spaeteste_oeffnungszeit:
+      name: Späteste Öffnungszeit
+      description: |
+        Spätestens zu dieser Uhrzeit wird der Rollladen geöffnet.
+        Der Ruhemodus wird dabei ignoriert.
+      default: "10:00:00"
+      selector:
+        time:
+
+    oeffnungshaehe_gekippt:
+      name: Rollladenposition bei gekippter Balkontür
+      description: |
+        Position des Rollladens bei gekippter Tür im Nachtmodus.
+      default: 25
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+
+    beschattung_behang:
+      name: Beschattung Behang
+      default: 30
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          unit_of_measurement: "%"
+
+    verzoegerung_oeffnen_min:
+      name: Verzögerung morgens
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 120
+          step: 1
+          unit_of_measurement: min
+
+    verzoegerung_schliessen_min:
+      name: Verzögerung abends
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 120
+          step: 1
+          unit_of_measurement: min
+
+
+triggers:
+
+  # Balkontür vollständig geöffnet / geschlossen
+  - trigger: state
+    entity_id: !input tuer_offen_sensor
+    id: tuer_offen_wechsel
+
+  # Balkontür gekippt / nicht mehr gekippt
+  - trigger: state
+    entity_id: !input tuer_gekippt_sensor
+    id: tuer_gekippt_wechsel
+
+  # Astro Tag
+  - trigger: state
+    entity_id: !input astro_modus
+    to: "off"
+    id: astro_wird_false
+
+  # Astro Nacht
+  - trigger: state
+    entity_id: !input astro_modus
+    to: "on"
+    id: astro_wird_true
+
+  # Beschattung EIN
+  - trigger: state
+    entity_id: !input beschattung_modus
+    to: "on"
+    id: beschattung_ein
+
+  # Beschattung AUS
+  - trigger: state
+    entity_id: !input beschattung_modus
+    to: "off"
+    id: beschattung_aus
+
+  # Ruhemodus AUS
+  - trigger: state
+    entity_id: !input ruhe_modus
+    to: "off"
+    id: ruhemodus_aus
+
+  # Späteste Öffnungszeit
+  - trigger: time
+    at: !input spaeteste_oeffnungszeit
+    id: spaeteste_oeffnungszeit
+
+
+variables:
+
+  tuer_offen_sensor: !input tuer_offen_sensor
+  tuer_gekippt_sensor: !input tuer_gekippt_sensor
+
+  rollladen_cover: !input rollladen_cover
+  astro_modus: !input astro_modus
+
+  ruhemodus_verwenden: !input ruhemodus_verwenden
+  ruhe_modus: !input ruhe_modus
+
+  beschattung_modus: !input beschattung_modus
+
+  oeffnungshaehe_gekippt: !input oeffnungshaehe_gekippt
+  beschattung_behang: !input beschattung_behang
+
+  verzoegerung_oeffnen_min: !input verzoegerung_oeffnen_min
+  verzoegerung_schliessen_min: !input verzoegerung_schliessen_min
+
+
+conditions: []
+
+
+actions:
+
+  - choose:
+
+      # ==========================================================
+      # TÜR WIRD VOLLSTÄNDIG GEÖFFNET
+      # ==========================================================
+      #
+      # ABSOLUTE SPERRE:
+      # Es wird bewusst KEIN Fahrbefehl ausgeführt.
+      #
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'tuer_offen_wechsel'
+                and is_state(tuer_offen_sensor, 'on')
+              }}
+
+        sequence:
+          - delay:
+              milliseconds: 1
+
+
+      # ==========================================================
+      # TÜR WIRD GEKIPPT
+      # ==========================================================
+      #
+      # Nachts -> Kipp-Position
+      # Tagsüber -> nur Beschattung, falls aktiv
+      #
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'tuer_gekippt_wechsel'
+                and is_state(tuer_gekippt_sensor, 'on')
+                and is_state(tuer_offen_sensor, 'off')
+              }}
+
+        sequence:
+
+          - choose:
+
+              # NACHT
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ is_state(astro_modus, 'on') }}
+
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ oeffnungshaehe_gekippt | int }}"
+
+
+              # TAG + BESCHATTUNG
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        is_state(astro_modus, 'off')
+                        and is_state(beschattung_modus, 'on')
+                      }}
+
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ beschattung_behang | int }}"
+
+
+      # ==========================================================
+      # TÜR WIRD GESCHLOSSEN
+      # ==========================================================
+      #
+      # Beide Sensoren AUS = wirklich geschlossen
+      #
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id in ['tuer_offen_wechsel', 'tuer_gekippt_wechsel']
+                and is_state(tuer_offen_sensor, 'off')
+                and is_state(tuer_gekippt_sensor, 'off')
+              }}
+
+        sequence:
+
+          - choose:
+
+              # NACHT -> vollständig schließen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ is_state(astro_modus, 'on') }}
+
+                sequence:
+                  - action: cover.close_cover
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+
+
+              # TAG + BESCHATTUNG -> Beschattungsposition
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        is_state(astro_modus, 'off')
+                        and is_state(beschattung_modus, 'on')
+                      }}
+
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ beschattung_behang | int }}"
+
+
+      # ==========================================================
+      # MORGEN – ASTRO WIRD AUS
+      # ==========================================================
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'astro_wird_false' }}
+
+        sequence:
+
+          - delay:
+              minutes: "{{ verzoegerung_oeffnen_min | int(0) }}"
+
+          - choose:
+
+              # Ruhemodus aktiv -> nichts machen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        ruhemodus_verwenden
+                        and ruhe_modus | count > 0
+                        and (
+                          expand(ruhe_modus)
+                          | selectattr('state', 'eq', 'on')
+                          | list
+                          | count > 0
+                        )
+                      }}
+
+                sequence:
+                  - delay:
+                      milliseconds: 1
+
+
+              # Tür offen -> vollständig öffnen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        (
+                          not ruhemodus_verwenden
+                          or ruhe_modus | count == 0
+                          or (
+                            expand(ruhe_modus)
+                            | selectattr('state', 'eq', 'on')
+                            | list
+                            | count == 0
+                          )
+                        )
+                        and is_state(tuer_offen_sensor, 'on')
+                      }}
+
+                sequence:
+                  - action: cover.open_cover
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+
+
+              # Beschattung aktiv + Tür NICHT offen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        (
+                          not ruhemodus_verwenden
+                          or ruhe_modus | count == 0
+                          or (
+                            expand(ruhe_modus)
+                            | selectattr('state', 'eq', 'on')
+                            | list
+                            | count == 0
+                          )
+                        )
+                        and is_state(tuer_offen_sensor, 'off')
+                        and is_state(beschattung_modus, 'on')
+                      }}
+
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ beschattung_behang | int }}"
+
+
+              # Keine Beschattung
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        (
+                          not ruhemodus_verwenden
+                          or ruhe_modus | count == 0
+                          or (
+                            expand(ruhe_modus)
+                            | selectattr('state', 'eq', 'on')
+                            | list
+                            | count == 0
+                          )
+                        )
+                        and is_state(beschattung_modus, 'off')
+                      }}
+
+                sequence:
+                  - action: cover.open_cover
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+
+
+      # ==========================================================
+      # RUHEMODUS WIRD TAGSÜBER AUSGESCHALTET
+      # ==========================================================
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'ruhemodus_aus'
+                and ruhemodus_verwenden
+                and is_state(astro_modus, 'off')
+              }}
+
+        sequence:
+
+          - choose:
+
+              # Tür offen -> öffnen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ is_state(tuer_offen_sensor, 'on') }}
+
+                sequence:
+                  - action: cover.open_cover
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+
+
+              # Tür nicht offen + Beschattung
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        is_state(tuer_offen_sensor, 'off')
+                        and is_state(beschattung_modus, 'on')
+                      }}
+
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ beschattung_behang | int }}"
+
+            default:
+              - action: cover.open_cover
+                target:
+                  entity_id: "{{ rollladen_cover }}"
+
+
+      # ==========================================================
+      # SPÄTESTE ÖFFNUNGSZEIT
+      # ==========================================================
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'spaeteste_oeffnungszeit'
+                and is_state(astro_modus, 'off')
+              }}
+
+        sequence:
+
+          - choose:
+
+              # Tür offen -> vollständig öffnen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ is_state(tuer_offen_sensor, 'on') }}
+
+                sequence:
+                  - action: cover.open_cover
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+
+
+              # Tür nicht offen + Beschattung
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        is_state(tuer_offen_sensor, 'off')
+                        and is_state(beschattung_modus, 'on')
+                      }}
+
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ beschattung_behang | int }}"
+
+            default:
+              - action: cover.open_cover
+                target:
+                  entity_id: "{{ rollladen_cover }}"
+
+
+      # ==========================================================
+      # ABEND – ASTRO WIRD EIN
+      # ==========================================================
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'astro_wird_true' }}
+
+        sequence:
+
+          # Beschattung ausschalten
+          - action: input_boolean.turn_off
+            target:
+              entity_id: "{{ beschattung_modus }}"
+
+          # Abendverzögerung
+          - delay:
+              minutes: "{{ verzoegerung_schliessen_min | int(0) }}"
+
+          - choose:
+
+              # --------------------------------------------------
+              # TÜR OFFEN
+              # ABSOLUTE SPERRE -> NICHT herunterfahren
+              # --------------------------------------------------
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ is_state(tuer_offen_sensor, 'on') }}
+
+                sequence:
+                  - delay:
+                      milliseconds: 1
+
+
+              # --------------------------------------------------
+              # TÜR GEKIPPT
+              # -> Kipp-Position
+              # --------------------------------------------------
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        is_state(tuer_offen_sensor, 'off')
+                        and is_state(tuer_gekippt_sensor, 'on')
+                      }}
+
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ oeffnungshaehe_gekippt | int }}"
+
+
+              # --------------------------------------------------
+              # TÜR GESCHLOSSEN
+              # -> vollständig schließen
+              # --------------------------------------------------
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        is_state(tuer_offen_sensor, 'off')
+                        and is_state(tuer_gekippt_sensor, 'off')
+                      }}
+
+                sequence:
+                  - action: cover.close_cover
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+
+
+      # ==========================================================
+      # BESCHATTUNG EIN
+      # ==========================================================
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'beschattung_ein'
+                and is_state(astro_modus, 'off')
+              }}
+
+        sequence:
+
+          - choose:
+
+              # TÜR OFFEN -> NICHT herunterfahren
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ is_state(tuer_offen_sensor, 'on') }}
+
+                sequence:
+                  - delay:
+                      milliseconds: 1
+
+
+              # Tür geschlossen oder gekippt -> Beschattung
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ is_state(tuer_offen_sensor, 'off') }}
+
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+                    data:
+                      position: "{{ beschattung_behang | int }}"
+
+
+      # ==========================================================
+      # BESCHATTUNG AUS
+      # ==========================================================
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'beschattung_aus'
+                and is_state(astro_modus, 'off')
+              }}
+
+        sequence:
+
+          - choose:
+
+              # Ruhemodus aktiv -> nichts machen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        ruhemodus_verwenden
+                        and ruhe_modus | count > 0
+                        and (
+                          expand(ruhe_modus)
+                          | selectattr('state', 'eq', 'on')
+                          | list
+                          | count > 0
+                        )
+                      }}
+
+                sequence:
+                  - delay:
+                      milliseconds: 1
+
+
+              # Ruhemodus nicht aktiv -> öffnen
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{
+                        not ruhemodus_verwenden
+                        or ruhe_modus | count == 0
+                        or (
+                          expand(ruhe_modus)
+                          | selectattr('state', 'eq', 'on')
+                          | list
+                          | count == 0
+                        )
+                      }}
+
+                sequence:
+                  - action: cover.open_cover
+                    target:
+                      entity_id: "{{ rollladen_cover }}"
+
+
+mode: parallel
+max: 10
